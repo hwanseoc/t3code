@@ -246,7 +246,7 @@ const ServerConfigLive = (input: CliInput) =>
               Option.fromUndefinedOr(bootstrap.autoBootstrapProjectFromCwd),
             ),
           ),
-          () => mode === "web",
+          () => false,
         ),
       );
       const logWebSocketEvents = resolveBooleanFlag(
