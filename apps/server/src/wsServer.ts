@@ -566,7 +566,8 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
           return;
         }
         const headers: Record<string, string> = { "Content-Type": contentType };
-        if (staticRelativePath.startsWith("assets/")) {
+        const normalizedStaticRelativePath = staticRelativePath.replace(/\\/g, "/");
+        if (normalizedStaticRelativePath.startsWith("assets/")) {
           headers["Cache-Control"] = "public, max-age=31536000, immutable";
         }
         respond(200, headers, data);
