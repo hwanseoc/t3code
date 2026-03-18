@@ -648,6 +648,24 @@ describe("WebSocket Server", () => {
     expect(await response.text()).toContain("static-root");
   });
 
+  it("serves immutable cache headers for static asset files", async () => {
+    const stateDir = makeTempDir("t3code-state-static-assets-");
+    const staticDir = makeTempDir("t3code-static-assets-");
+    const assetsDir = path.join(staticDir, "assets");
+    fs.mkdirSync(assetsDir, { recursive: true });
+    fs.writeFileSync(path.join(staticDir, "index.html"), "<h1>static-root</h1>", "utf8");
+    fs.writeFileSync(path.join(assetsDir, "index-abc123.js"), "console.log('hello');", "utf8");
+
+    server = await createTestServer({ cwd: "/test/project", stateDir, staticDir });
+    const addr = server.address();
+    const port = typeof addr === "object" && addr !== null ? addr.port : 0;
+    expect(port).toBeGreaterThan(0);
+
+    const response = await fetch(`http://127.0.0.1:${port}/assets/index-abc123.js`);
+    expect(response.status).toBe(200);
+    expect(response.headers.get("cache-control")).toBe("public, max-age=31536000, immutable");
+  });
+
   it("rejects static path traversal attempts", async () => {
     const stateDir = makeTempDir("t3code-state-static-traversal-");
     const staticDir = makeTempDir("t3code-static-traversal-");
