@@ -578,7 +578,17 @@ export const createServer = Effect.fn(function* (): Effect.fn.Return<
           respond(500, { "Content-Type": "text/plain" }, "Internal Server Error");
           return;
         }
-        respond(200, { "Content-Type": contentType }, data);
+        const headers: Record<string, string> = { "Content-Type": contentType };
+        if (staticRelativePath.startsWith("assets/")) {
+          headers["Cache-Control"] = "public, max-age=31536000, immutable";
+        } else if (
+          /^(?:favicon(?:-\d+x\d+)?\.png|favicon\.ico|apple-touch-icon\.png)$/.test(
+            staticRelativePath,
+          )
+        ) {
+          headers["Cache-Control"] = "public, max-age=3600";
+        }
+        respond(200, headers, data);
       }),
     ).catch(() => {
       if (!res.headersSent) {
