@@ -45,9 +45,6 @@ import {
   OrchestrationEngineService,
   type OrchestrationEngineShape,
 } from "../Services/OrchestrationEngine.ts";
-const isOrchestrationCommandPreviouslyRejectedError = Schema.is(
-  OrchestrationCommandPreviouslyRejectedError,
-);
 const isOrchestrationCommandInvariantError = Schema.is(OrchestrationCommandInvariantError);
 
 interface CommandEnvelope {
@@ -103,27 +100,12 @@ const makeOrchestrationEngine = Effect.gen(function* () {
     });
 
   const processEnvelope = (envelope: CommandEnvelope): Effect.Effect<void> => {
-    const dispatchStartSequence = commandReadModel.snapshotSequence;
     let processingStartedAtMs = 0;
     const aggregateRef = commandToAggregateRef(envelope.command);
     const baseMetricAttributes = {
       commandType: envelope.command.type,
       aggregateKind: aggregateRef.aggregateKind,
     } as const;
-    const reconcileReadModelAfterDispatchFailure = Effect.gen(function* () {
-      const persistedEvents = yield* Stream.runCollect(
-        eventStore.readFromSequence(dispatchStartSequence),
-      ).pipe(Effect.map((chunk): OrchestrationEvent[] => Array.from(chunk)));
-      if (persistedEvents.length === 0) {
-        return;
-      }
-
-      commandReadModel = yield* projectEventsOntoReadModel(commandReadModel, persistedEvents);
-
-      for (const persistedEvent of persistedEvents) {
-        yield* PubSub.publish(eventPubSub, persistedEvent);
-      }
-    });
 
     return Effect.exit(
       Effect.gen(function* () {
@@ -147,6 +129,48 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           return yield* new OrchestrationCommandPreviouslyRejectedError({
             commandId: envelope.command.commandId,
             detail: existingReceipt.value.error ?? "Previously rejected.",
+          });
+        }
+
+        // The in-memory command read model only sees events committed by this
+        // engine, but other processes (e.g. the project CLI running offline)
+        // may append events to the shared event store directly. Replay
+        // anything past the in-memory snapshot so the command is decided
+        // against persisted state. On replay failure the dispatch proceeds on
+        // the current model rather than failing; a subsequent successful
+        // commit then advances the cursor past whatever the failed replay
+        // left behind, and those events stay invisible to this model until
+        // the next restart re-hydrates it.
+        const reconciled = yield* Effect.result(
+          Effect.gen(function* () {
+            // readFromSequence caps each read (default 1,000 events), so loop
+            // until the tail is drained. The projector advances the snapshot
+            // cursor to whatever it applies, and any event left behind here
+            // would become permanently invisible to the read model.
+            while (true) {
+              const persistedEvents = Array.from(
+                yield* Stream.runCollect(
+                  eventStore.readFromSequence(commandReadModel.snapshotSequence),
+                ),
+              );
+              if (persistedEvents.length === 0) {
+                break;
+              }
+              commandReadModel = yield* projectEventsOntoReadModel(
+                commandReadModel,
+                persistedEvents,
+              );
+              for (const persistedEvent of persistedEvents) {
+                yield* PubSub.publish(eventPubSub, persistedEvent);
+              }
+            }
+          }),
+        );
+        if (reconciled._tag === "Failure") {
+          yield* Effect.logWarning("failed to reconcile orchestration read model before dispatch", {
+            commandId: envelope.command.commandId,
+            snapshotSequence: commandReadModel.snapshotSequence,
+            cause: reconciled.failure,
           });
         }
 
@@ -262,33 +286,18 @@ const makeOrchestrationEngine = Effect.gen(function* () {
           }
 
           const error = Cause.squash(exit.cause) as OrchestrationDispatchError;
-          if (!isOrchestrationCommandPreviouslyRejectedError(error)) {
-            yield* reconcileReadModelAfterDispatchFailure.pipe(
-              Effect.catch(() =>
-                Effect.logWarning(
-                  "failed to reconcile orchestration read model after dispatch failure",
-                ).pipe(
-                  Effect.annotateLogs({
-                    commandId: envelope.command.commandId,
-                    snapshotSequence: commandReadModel.snapshotSequence,
-                  }),
-                ),
-              ),
-            );
-
-            if (isOrchestrationCommandInvariantError(error)) {
-              yield* commandReceiptRepository
-                .upsert({
-                  commandId: envelope.command.commandId,
-                  aggregateKind: aggregateRef.aggregateKind,
-                  aggregateId: aggregateRef.aggregateId,
-                  acceptedAt: yield* nowIso,
-                  resultSequence: commandReadModel.snapshotSequence,
-                  status: "rejected",
-                  error: error.message,
-                })
-                .pipe(Effect.catch(() => Effect.void));
-            }
+          if (isOrchestrationCommandInvariantError(error)) {
+            yield* commandReceiptRepository
+              .upsert({
+                commandId: envelope.command.commandId,
+                aggregateKind: aggregateRef.aggregateKind,
+                aggregateId: aggregateRef.aggregateId,
+                acceptedAt: yield* nowIso,
+                resultSequence: commandReadModel.snapshotSequence,
+                status: "rejected",
+                error: error.message,
+              })
+              .pipe(Effect.catch(() => Effect.void));
           }
 
           yield* Deferred.fail(envelope.result, error);
