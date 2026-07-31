@@ -195,6 +195,27 @@ describe("buildTurnStartParams", () => {
     NodeAssert.ok(settings?.developer_instructions?.includes(`as ${DEFAULT_MODEL} with medium`));
   });
 
+  it.effect("omits developer instructions when injection is disabled", () =>
+    Effect.gen(function* () {
+      const params = yield* buildTurnStartParams({
+        threadId: "provider-thread-1",
+        runtimeMode: "full-access",
+        prompt: "Go",
+        model: "gpt-5.3-codex",
+        interactionMode: "plan",
+        injectDeveloperInstructions: false,
+      });
+
+      NodeAssert.deepStrictEqual(params.collaborationMode, {
+        mode: "plan",
+        settings: {
+          model: "gpt-5.3-codex",
+          reasoning_effort: "medium",
+        },
+      });
+    }),
+  );
+
   it.effect("routes approvals to the auto reviewer in auto mode", () =>
     Effect.gen(function* () {
       const params = yield* buildTurnStartParams({

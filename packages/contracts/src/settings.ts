@@ -237,13 +237,28 @@ export const CodexSettings = makeProviderSettingsSchema(
         description: "Additional CLI arguments passed to codex app-server on session start.",
       }),
     ),
+    injectDeveloperInstructions: Schema.Boolean.pipe(
+      Schema.withDecodingDefault(Effect.succeed(true)),
+      Schema.annotateKey({
+        title: "Developer instructions",
+        description:
+          "Inject T3 Code's collaboration mode instructions into Codex turns. Turning this off also removes Plan mode rules and preview browser guidance.",
+        providerSettingsForm: { control: "switch" },
+      }),
+    ),
     customModels: Schema.Array(Schema.String).pipe(
       Schema.withDecodingDefault(Effect.succeed([])),
       Schema.annotateKey({ providerSettingsForm: { hidden: true } }),
     ),
   },
   {
-    order: ["binaryPath", "homePath", "shadowHomePath", "launchArgs"],
+    order: [
+      "binaryPath",
+      "homePath",
+      "shadowHomePath",
+      "launchArgs",
+      "injectDeveloperInstructions",
+    ],
   },
 );
 export type CodexSettings = typeof CodexSettings.Type;
@@ -591,6 +606,7 @@ const CodexSettingsPatch = Schema.Struct({
   homePath: Schema.optionalKey(TrimmedString),
   shadowHomePath: Schema.optionalKey(TrimmedString),
   launchArgs: Schema.optionalKey(TrimmedString),
+  injectDeveloperInstructions: Schema.optionalKey(Schema.Boolean),
   customModels: Schema.optionalKey(Schema.Array(Schema.String)),
 });
 
