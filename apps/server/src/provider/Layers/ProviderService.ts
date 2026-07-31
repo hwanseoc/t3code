@@ -55,6 +55,7 @@ import * as ProviderEventLoggers from "./ProviderEventLoggers.ts";
 import * as AnalyticsService from "../../telemetry/AnalyticsService.ts";
 import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
 import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
+import { ServerSettingsService } from "../../serverSettings.ts";
 const isModelSelection = Schema.is(ModelSelection);
 
 /**
@@ -212,16 +213,37 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
 
   const registry = yield* ProviderAdapterRegistry.ProviderAdapterRegistry;
   const directory = yield* ProviderSessionDirectory.ProviderSessionDirectory;
+  const serverSettings = yield* ServerSettingsService;
   const runtimeEventPubSub = yield* PubSub.unbounded<ProviderRuntimeEvent>();
   const nowIso = Effect.map(DateTime.now, DateTime.formatIso);
   const prepareMcpSession = (threadId: ThreadId, providerInstanceId: ProviderInstanceId) =>
-    McpSessionRegistry.issueActiveMcpCredential({ threadId, providerInstanceId }).pipe(
-      Effect.tap((credential) =>
-        credential
-          ? Effect.sync(() => McpProviderSession.setMcpProviderSession(credential.config))
-          : Effect.void,
-      ),
-    );
+    Effect.gen(function* () {
+      // Read at session start so toggling `enableMcpServer` applies to the
+      // next session without a server restart. A settings read failure must
+      // not block sessions, so fall back to the default (enabled) behavior.
+      const mcpServerEnabled = yield* serverSettings.getSettings.pipe(
+        Effect.map((settings) => settings.enableMcpServer),
+        Effect.catch((cause) =>
+          Effect.logWarning(
+            "Failed to read server settings while preparing MCP session; defaulting to enabled.",
+            { cause },
+          ).pipe(Effect.as(true)),
+        ),
+      );
+      if (!mcpServerEnabled) {
+        // Revoke any credential issued before the setting was turned off so a
+        // restarted session never picks up a stale MCP config.
+        yield* clearMcpSession(threadId);
+        return;
+      }
+      yield* McpSessionRegistry.issueActiveMcpCredential({ threadId, providerInstanceId }).pipe(
+        Effect.tap((credential) =>
+          credential
+            ? Effect.sync(() => McpProviderSession.setMcpProviderSession(credential.config))
+            : Effect.void,
+        ),
+      );
+    });
   const clearMcpSession = (threadId: ThreadId) =>
     McpSessionRegistry.revokeActiveMcpThread(threadId).pipe(
       Effect.tap(() => Effect.sync(() => McpProviderSession.clearMcpProviderSession(threadId))),

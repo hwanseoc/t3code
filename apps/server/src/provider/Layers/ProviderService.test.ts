@@ -12,6 +12,7 @@ import type {
 } from "@t3tools/contracts";
 import {
   ApprovalRequestId,
+  EnvironmentId,
   EventId,
   ProviderDriverKind,
   ProviderInstanceId,
@@ -34,6 +35,11 @@ import * as Scope from "effect/Scope";
 import * as Stream from "effect/Stream";
 import * as TestClock from "effect/testing/TestClock";
 import * as SqlClient from "effect/unstable/sql/SqlClient";
+import { HttpServer } from "effect/unstable/http";
+
+import * as ServerEnvironment from "../../environment/ServerEnvironment.ts";
+import * as McpProviderSession from "../../mcp/McpProviderSession.ts";
+import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
 
 import {
   ProviderAdapterRequestError,
@@ -581,6 +587,98 @@ it.effect("ProviderServiceLive rejects new sessions for disabled custom instance
     assert.include(failure.issue, "Provider instance 'codex_personal' is disabled");
     assert.equal(codex.startSession.mock.calls.length, 0);
   }).pipe(Effect.provide(NodeServices.layer)),
+);
+
+it.effect("ProviderServiceLive gates MCP credential issuance on the enableMcpServer setting", () =>
+  Effect.gen(function* () {
+    const codex = makeFakeCodexAdapter();
+    const registry = makeAdapterRegistryMock({
+      [CODEX_DRIVER]: codex.adapter,
+    });
+    const providerAdapterLayer = Layer.succeed(
+      ProviderAdapterRegistry.ProviderAdapterRegistry,
+      registry,
+    );
+    const runtimeRepositoryLayer = ProviderSessionRuntime.layer.pipe(
+      Layer.provide(SqlitePersistenceMemory),
+    );
+    const directoryLayer = ProviderSessionDirectoryLive.pipe(Layer.provide(runtimeRepositoryLayer));
+    const mcpRegistryLayer = McpSessionRegistry.layer.pipe(
+      Layer.provide(
+        Layer.succeed(
+          HttpServer.HttpServer,
+          HttpServer.HttpServer.of({
+            address: { _tag: "TcpAddress", hostname: "127.0.0.1", port: 43123 },
+            serve: (() => Effect.void) as HttpServer.HttpServer["Service"]["serve"],
+          }),
+        ),
+      ),
+      Layer.provide(
+        Layer.succeed(
+          ServerEnvironment.ServerEnvironment,
+          ServerEnvironment.ServerEnvironment.of({
+            getEnvironmentId: Effect.succeed(EnvironmentId.make("environment-1")),
+            getDescriptor: Effect.die("unused"),
+          }),
+        ),
+      ),
+      Layer.provide(NodeServices.layer),
+    );
+    const makeProviderLayer = <E>(
+      settingsLayer: Layer.Layer<ServerSettings.ServerSettingsService, E>,
+    ) =>
+      makeProviderServiceLive().pipe(
+        Layer.provide(providerAdapterLayer),
+        Layer.provide(directoryLayer),
+        Layer.provide(settingsLayer),
+        Layer.provide(mcpRegistryLayer),
+        Layer.provideMerge(AnalyticsService.layerTest),
+        Layer.provide(
+          Layer.succeed(
+            ProviderEventLoggers.ProviderEventLoggers,
+            ProviderEventLoggers.NoOpProviderEventLoggers,
+          ),
+        ),
+      );
+
+    const startSessionAndReadMcpConfig = <E>(
+      settingsLayer: Layer.Layer<ServerSettings.ServerSettingsService, E>,
+    ) =>
+      Effect.gen(function* () {
+        const scope = yield* Scope.make();
+        const runtimeServices = yield* Layer.build(makeProviderLayer(settingsLayer)).pipe(
+          Scope.provide(scope),
+        );
+        const threadId = asThreadId("thread-mcp-gate");
+        yield* ProviderService.ProviderService.pipe(
+          Effect.flatMap((provider) =>
+            provider.startSession(threadId, {
+              provider: CODEX_DRIVER,
+              providerInstanceId: codexInstanceId,
+              threadId,
+              cwd: "/tmp/project",
+              runtimeMode: "full-access",
+            }),
+          ),
+          Effect.provide(runtimeServices),
+        );
+        const config = McpProviderSession.readMcpProviderSession(threadId);
+        yield* Scope.close(scope, Exit.void);
+        return config;
+      });
+
+    McpProviderSession.clearAllMcpProviderSessions();
+
+    const disabledConfig = yield* startSessionAndReadMcpConfig(
+      ServerSettings.ServerSettingsService.layerTest({ enableMcpServer: false }),
+    );
+    assert.equal(disabledConfig, undefined);
+
+    const enabledConfig = yield* startSessionAndReadMcpConfig(defaultServerSettingsLayer);
+    assert.equal(enabledConfig?.endpoint, "http://127.0.0.1:43123/mcp");
+
+    McpProviderSession.clearAllMcpProviderSessions();
+  }),
 );
 
 const routing = makeProviderServiceLayer();

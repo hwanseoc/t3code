@@ -598,6 +598,9 @@ export function useSettingsRestore(onRestored?: () => void) {
       DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks
         ? ["Provider update checks"]
         : []),
+      ...(settings.enableMcpServer !== DEFAULT_UNIFIED_SETTINGS.enableMcpServer
+        ? ["Agent browser tools"]
+        : []),
       ...(isBackgroundActivityDirty ? ["Background activity"] : []),
       ...(settings.defaultThreadEnvMode !== DEFAULT_UNIFIED_SETTINGS.defaultThreadEnvMode
         ? ["New thread mode"]
@@ -631,6 +634,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       settings.glassOpacity,
       settings.enableAssistantStreaming,
       settings.enableProviderUpdateChecks,
+      settings.enableMcpServer,
       settings.sidebarProjectGroupingMode,
       settings.sidebarThreadPreviewCount,
       settings.timestampFormat,
@@ -661,6 +665,7 @@ export function useSettingsRestore(onRestored?: () => void) {
       autoOpenPlanSidebar: DEFAULT_UNIFIED_SETTINGS.autoOpenPlanSidebar,
       enableAssistantStreaming: DEFAULT_UNIFIED_SETTINGS.enableAssistantStreaming,
       enableProviderUpdateChecks: DEFAULT_UNIFIED_SETTINGS.enableProviderUpdateChecks,
+      enableMcpServer: DEFAULT_UNIFIED_SETTINGS.enableMcpServer,
       backgroundActivity: DEFAULT_UNIFIED_SETTINGS.backgroundActivity,
       backgroundActivityProfile: DEFAULT_UNIFIED_SETTINGS.backgroundActivityProfile,
       automaticGitFetchInterval: DEFAULT_UNIFIED_SETTINGS.automaticGitFetchInterval,
@@ -1323,6 +1328,30 @@ export function GeneralSettingsPanel() {
                 updateSettings({ enableProviderUpdateChecks: Boolean(checked) })
               }
               aria-label="Check provider versions"
+            />
+          }
+        />
+
+        <SettingsRow
+          title="Agent browser tools"
+          description="Expose the t3-code MCP server to agents, giving them the preview browser tools. Applies when a session starts."
+          resetAction={
+            settings.enableMcpServer !== DEFAULT_UNIFIED_SETTINGS.enableMcpServer ? (
+              <SettingResetButton
+                label="agent browser tools"
+                onClick={() =>
+                  updateSettings({
+                    enableMcpServer: DEFAULT_UNIFIED_SETTINGS.enableMcpServer,
+                  })
+                }
+              />
+            ) : null
+          }
+          control={
+            <Switch
+              checked={settings.enableMcpServer}
+              onCheckedChange={(checked) => updateSettings({ enableMcpServer: Boolean(checked) })}
+              aria-label="Enable agent browser tools"
             />
           }
         />
