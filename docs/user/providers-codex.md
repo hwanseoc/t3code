@@ -139,3 +139,16 @@ Use a totally separate `CODEX_HOME path` only when you want a separate Codex wor
 
 That means separate sessions and less account switching inside old threads. Most dual-account users
 should use the shared-home plus shadow-home setup instead.
+
+## Visual Tools And T3 Preview
+
+In Settings → General → Agent visual tools, choose how newly started Codex sessions should browse
+and inspect pages:
+
+- **T3 Preview** (default): newly started sessions receive the T3 Preview MCP tools and Codex
+  routing instructions that prefer those tools.
+- **Provider native**: T3 does not give Codex the T3 Preview MCP tools or collaborative
+  browser instructions. Codex can use its own visual tools.
+
+You can still open and use T3 Preview yourself in either mode. Changing the setting does not remove
+tools from a session that is already running — start a new session after you switch.

@@ -6,6 +6,7 @@ import {
   type ProviderInstanceConfig,
 } from "@t3tools/contracts";
 import { getBackgroundActivityPresetSettings } from "@t3tools/shared/backgroundActivitySettings";
+import { applyServerSettingsPatch } from "@t3tools/shared/serverSettings";
 import * as Duration from "effect/Duration";
 import { describe, expect, it } from "vite-plus/test";
 import {
@@ -17,6 +18,23 @@ import {
   projectGroupingModeFromToggle,
   resolveBackgroundActivityProfileOption,
 } from "./SettingsPanels.logic";
+
+describe("agent visual tools setting defaults", () => {
+  it("defaults to T3 Preview and stays patchable to provider-native", () => {
+    expect(DEFAULT_UNIFIED_SETTINGS.agentVisualToolsMode).toBe("t3-preview");
+    expect(DEFAULT_SERVER_SETTINGS.agentVisualToolsMode).toBe("t3-preview");
+
+    const providerNative = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
+      agentVisualToolsMode: "provider-native",
+    });
+    expect(providerNative.agentVisualToolsMode).toBe("provider-native");
+
+    const restored = applyServerSettingsPatch(providerNative, {
+      agentVisualToolsMode: "t3-preview",
+    });
+    expect(restored.agentVisualToolsMode).toBe("t3-preview");
+  });
+});
 
 describe("background activity settings restore", () => {
   it("detects legacy interval values even when the structured setting is at its default", () => {
