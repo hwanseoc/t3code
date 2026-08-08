@@ -10,6 +10,7 @@
  * @module ProviderServiceLive
  */
 import {
+  DEFAULT_AGENT_VISUAL_TOOLS_MODE,
   ModelSelection,
   NonNegativeInt,
   ThreadId,
@@ -225,14 +226,14 @@ const makeProviderService = Effect.fn("makeProviderService")(function* (
     providerInstanceId: ProviderInstanceId,
   ): Effect.Effect<void> =>
     Effect.gen(function* () {
-      // Fail closed to provider-native if settings cannot be read, so agents never
-      // receive T3 Preview tools by accident. Keeps ServerSettingsError out of the
-      // ProviderService error channel.
+      // Fall back to the default mode if settings cannot be read, so an unreadable
+      // settings file does not silently strip tools a session would otherwise get.
+      // Keeps ServerSettingsError out of the ProviderService error channel.
       const settingsResult = yield* Effect.result(serverSettings.getSettings);
       const agentVisualToolsMode =
         settingsResult._tag === "Success"
           ? settingsResult.success.agentVisualToolsMode
-          : ("provider-native" as const);
+          : DEFAULT_AGENT_VISUAL_TOOLS_MODE;
       if (agentVisualToolsMode !== "t3-preview") {
         // Drop any leftover credential/session from a prior T3 Preview run on
         // this thread so provider-native sessions cannot inherit stale tools.

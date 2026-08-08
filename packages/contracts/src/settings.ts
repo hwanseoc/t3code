@@ -541,7 +541,11 @@ export type BackgroundActivitySettings = typeof BackgroundActivitySettings.Type;
  */
 export const AgentVisualToolsMode = Schema.Literals(["provider-native", "t3-preview"]);
 export type AgentVisualToolsMode = typeof AgentVisualToolsMode.Type;
-export const DEFAULT_AGENT_VISUAL_TOOLS_MODE: AgentVisualToolsMode = "provider-native";
+/**
+ * Defaults to `t3-preview` so upgrading changes nothing: agents keep the tools
+ * they have today until someone opts out.
+ */
+export const DEFAULT_AGENT_VISUAL_TOOLS_MODE: AgentVisualToolsMode = "t3-preview";
 
 export const ServerSettings = Schema.Struct({
   enableAssistantStreaming: Schema.Boolean.pipe(Schema.withDecodingDefault(Effect.succeed(false))),

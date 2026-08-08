@@ -214,9 +214,9 @@ Do not put environment variable assignments in `Launch arguments`.
 In Settings → General → Agent visual tools, choose how newly started Claude sessions should get
 browser/visual tools from T3:
 
-- **Provider native** (default): T3 does not mount the T3 Preview MCP server on the Claude session.
+- **T3 Preview** (default): newly started sessions receive the T3 Preview MCP tools.
+- **Provider native**: T3 does not mount the T3 Preview MCP server on the Claude session.
   Claude can use its own visual tools.
-- **T3 Preview**: newly started sessions receive the T3 Preview MCP tools.
 
 You can still open and use T3 Preview yourself in either mode. Changing the setting does not remove
 tools from a session that is already running — start a new session after you switch.

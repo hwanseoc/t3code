@@ -20,19 +20,19 @@ import {
 } from "./SettingsPanels.logic";
 
 describe("agent visual tools setting defaults", () => {
-  it("defaults to provider-native and stays patchable to T3 Preview", () => {
-    expect(DEFAULT_UNIFIED_SETTINGS.agentVisualToolsMode).toBe("provider-native");
-    expect(DEFAULT_SERVER_SETTINGS.agentVisualToolsMode).toBe("provider-native");
+  it("defaults to T3 Preview and stays patchable to provider-native", () => {
+    expect(DEFAULT_UNIFIED_SETTINGS.agentVisualToolsMode).toBe("t3-preview");
+    expect(DEFAULT_SERVER_SETTINGS.agentVisualToolsMode).toBe("t3-preview");
 
-    const preview = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
-      agentVisualToolsMode: "t3-preview",
-    });
-    expect(preview.agentVisualToolsMode).toBe("t3-preview");
-
-    const restored = applyServerSettingsPatch(preview, {
+    const providerNative = applyServerSettingsPatch(DEFAULT_SERVER_SETTINGS, {
       agentVisualToolsMode: "provider-native",
     });
-    expect(restored.agentVisualToolsMode).toBe("provider-native");
+    expect(providerNative.agentVisualToolsMode).toBe("provider-native");
+
+    const restored = applyServerSettingsPatch(providerNative, {
+      agentVisualToolsMode: "t3-preview",
+    });
+    expect(restored.agentVisualToolsMode).toBe("t3-preview");
   });
 });
 

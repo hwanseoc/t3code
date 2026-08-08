@@ -64,6 +64,11 @@ import * as McpSessionRegistry from "../../mcp/McpSessionRegistry.ts";
 
 const defaultServerSettingsLayer = ServerSettings.ServerSettingsService.layerTest();
 
+// The default mode is `t3-preview`, so provider-native cases must opt in explicitly.
+const providerNativeServerSettingsLayer = ServerSettings.ServerSettingsService.layerTest({
+  agentVisualToolsMode: "provider-native",
+});
+
 const asRequestId = (value: string): ApprovalRequestId => ApprovalRequestId.make(value);
 const asEventId = (value: string): EventId => EventId.make(value);
 const asThreadId = (value: string): ThreadId => ThreadId.make(value);
@@ -1921,7 +1926,7 @@ it.effect(
       const providerLayer = makeProviderServiceLive().pipe(
         Layer.provide(providerAdapterLayer),
         Layer.provide(directoryLayer),
-        Layer.provide(defaultServerSettingsLayer),
+        Layer.provide(providerNativeServerSettingsLayer),
         Layer.provide(AnalyticsService.layerTest),
         Layer.provide(
           Layer.succeed(
@@ -1983,7 +1988,7 @@ it.effect(
       const providerLayer = makeProviderServiceLive().pipe(
         Layer.provide(providerAdapterLayer),
         Layer.provide(directoryLayer),
-        Layer.provide(defaultServerSettingsLayer),
+        Layer.provide(providerNativeServerSettingsLayer),
         Layer.provide(AnalyticsService.layerTest),
         Layer.provide(
           Layer.succeed(

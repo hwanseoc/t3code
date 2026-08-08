@@ -188,9 +188,9 @@ describe("ServerSettings worktree defaults", () => {
 });
 
 describe("ServerSettings.agentVisualToolsMode", () => {
-  it("defaults to provider-native for legacy configs", () => {
-    expect(decodeServerSettings({}).agentVisualToolsMode).toBe("provider-native");
-    expect(DEFAULT_SERVER_SETTINGS.agentVisualToolsMode).toBe("provider-native");
+  it("defaults to t3-preview so legacy configs keep today's behavior", () => {
+    expect(decodeServerSettings({}).agentVisualToolsMode).toBe("t3-preview");
+    expect(DEFAULT_SERVER_SETTINGS.agentVisualToolsMode).toBe("t3-preview");
   });
 
   it("accepts both routing modes through the patch schema", () => {
