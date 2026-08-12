@@ -100,6 +100,15 @@ This is useful when a Codex-compatible setup needs account-specific variables. A
 the provider instance that should receive them, and mark API keys or tokens as sensitive. Sensitive
 values are stored as server secrets and are not sent back to the app after saving.
 
+## I Want Codex Without T3 Code's Extra Instructions
+
+By default, T3 Code adds its own developer instructions to every Codex turn. These carry Plan mode
+rules, preview browser guidance, and a note about which model is running.
+
+Turn off **Developer instructions** in the Codex provider's Settings to run Codex with its native
+behavior. Plan mode then loses its strict rules, so only disable this if you prefer Codex's built-in
+behavior.
+
 ## Can I Switch Accounts In An Existing Thread?
 
 Yes, when both Codex providers share the same `CODEX_HOME path`.
