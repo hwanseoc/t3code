@@ -8,13 +8,15 @@ import { useAtomCommand } from "../state/use-atom-command";
 
 const EMPTY_ORDER: readonly string[] = [];
 
-// A reorder shows immediately and holds until the owning server's order it was
-// based on changes (our own broadcast, or another client's), or the save fails.
-// Compared by content: every settings broadcast decodes a fresh array.
+// A reorder shows immediately and holds while the owning server still has an
+// order it was built on: the order before the drag, or an earlier drag in the
+// same chain whose save landed first. Any other server order (our final
+// broadcast, or another client's) replaces it, as does a failed save. Compared
+// by content: every settings broadcast decodes a fresh array.
 interface PendingOrder {
   readonly environmentId: string;
   readonly order: readonly string[];
-  readonly base: readonly string[] | null;
+  readonly bases: readonly (readonly string[] | null)[];
 }
 const usePendingOrder = create<{ pending: PendingOrder | null }>(() => ({ pending: null }));
 
@@ -74,7 +76,7 @@ export function useProjectOrder(): readonly string[] {
   if (
     pending &&
     pending.environmentId === environment?.environmentId &&
-    sameOrder(pending.base, server)
+    pending.bases.some((base) => sameOrder(base, server))
   ) {
     return pending.order;
   }
@@ -92,10 +94,15 @@ export function useReorderProjects() {
     ) => {
       const order = reorderProjectKeys(currentOrder, draggedKeys, targetKeys);
       if (!order || !environment) return;
+      const server = environment.serverConfig?.settings.sidebarProjectOrder ?? null;
+      const previous = usePendingOrder.getState().pending;
+      const chained =
+        previous?.environmentId === environment.environmentId &&
+        previous.bases.some((base) => sameOrder(base, server));
       const pending = {
         environmentId: environment.environmentId,
         order,
-        base: environment.serverConfig?.settings.sidebarProjectOrder ?? null,
+        bases: chained ? [...previous.bases, previous.order] : [server],
       };
       usePendingOrder.setState({ pending });
       const result = await persist({

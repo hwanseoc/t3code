@@ -128,6 +128,25 @@ it("shows a reorder immediately and hands off to the server broadcast", async ()
   expect(displayed).toEqual(["remote:/c", "remote:/b", "remote:/a"]);
 });
 
+it("keeps a second quick drag when the first save broadcasts first", () => {
+  const original = ["remote:/a", "remote:/b", "remote:/c"];
+  environments = [environment("remote", original)];
+  mocks.persist.mockReturnValue(new Promise(() => {}));
+  act(() => renderer.update(<Probe />));
+  act(() => {
+    void reorder(original, ["remote:/a"], ["remote:/c"]);
+  });
+  const first = displayed;
+  act(() => {
+    void reorder(first, ["remote:/b"], ["remote:/a"]);
+  });
+  const second = displayed;
+  expect(second).toEqual(["remote:/c", "remote:/a", "remote:/b"]);
+  environments = [environment("remote", [...first])];
+  act(() => renderer.update(<Probe />));
+  expect(displayed).toEqual(second);
+});
+
 it("keeps a pending reorder through an unrelated settings broadcast", () => {
   const original = ["remote:/a", "remote:/b"];
   environments = [environment("remote", original)];

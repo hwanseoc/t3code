@@ -2427,6 +2427,11 @@ export default function Sidebar() {
     (event: DragEndEvent) => {
       const active = projectGroupByScopeKey.get(String(event.active.id));
       const over = event.over ? projectGroupByScopeKey.get(String(event.over.id)) : undefined;
+      // The click that ends this drag fires right after; clear the flag once it
+      // has, so a drop without a click cannot block the next keyboard selection.
+      setTimeout(() => {
+        projectScopeDraggedRef.current = false;
+      });
       if (!active || !over || active === over) return;
       void reorderProjects(
         orderedProjects.map(getProjectOrderKey),
@@ -4556,6 +4561,9 @@ export default function Sidebar() {
                         projectScopeDraggedRef.current = true;
                       }}
                       onDragEnd={handleProjectScopeDragEnd}
+                      onDragCancel={() => {
+                        projectScopeDraggedRef.current = false;
+                      }}
                     >
                       <SortableContext
                         items={projectGroups.map((project) => project.projectKey)}
