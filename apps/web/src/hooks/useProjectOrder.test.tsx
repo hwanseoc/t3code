@@ -147,6 +147,14 @@ it("keeps a second quick drag when the first save broadcasts first", () => {
   expect(displayed).toEqual(second);
 });
 
+it("keeps projects this client cannot see next to the project they followed", async () => {
+  environments = [environment("a", ["a:/1", "b:/hidden", "a:/2", "a:/3"])];
+  act(() => renderer.update(<Probe />));
+  await act(async () => reorder(["a:/1", "a:/2", "a:/3"], ["a:/3"], ["a:/1"]));
+  const saved = mocks.persist.mock.calls[0]![0].input.patch.sidebarProjectOrder;
+  expect(saved).toEqual(["a:/3", "a:/1", "b:/hidden", "a:/2"]);
+});
+
 it("keeps a pending reorder through an unrelated settings broadcast", () => {
   const original = ["remote:/a", "remote:/b"];
   environments = [environment("remote", original)];

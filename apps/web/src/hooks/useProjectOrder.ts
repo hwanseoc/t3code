@@ -55,6 +55,28 @@ export function reorderProjectKeys(
   return order;
 }
 
+/**
+ * Keeps keys missing from `next` (projects this client cannot see, such as a
+ * server still loading) after the key they followed in `previous`, so a
+ * reorder never drops another environment's placement.
+ */
+function keepUnseenKeys(next: readonly string[], previous: readonly string[]): string[] {
+  const seen = new Set(next);
+  const unseenAfter = new Map<string | null, string[]>();
+  let anchor: string | null = null;
+  for (const key of previous) {
+    if (seen.has(key)) {
+      anchor = key;
+    } else {
+      unseenAfter.set(anchor, [...(unseenAfter.get(anchor) ?? []), key]);
+    }
+  }
+  return [
+    ...(unseenAfter.get(null) ?? []),
+    ...next.flatMap((key) => [key, ...(unseenAfter.get(key) ?? [])]),
+  ];
+}
+
 function sameOrder(a: readonly string[] | null, b: readonly string[] | null) {
   return a === b || (!!a && !!b && a.length === b.length && a.every((key, i) => key === b[i]));
 }
@@ -92,13 +114,14 @@ export function useReorderProjects() {
       draggedKeys: readonly string[],
       targetKeys: readonly string[],
     ) => {
-      const order = reorderProjectKeys(currentOrder, draggedKeys, targetKeys);
-      if (!order || !environment) return;
+      const reordered = reorderProjectKeys(currentOrder, draggedKeys, targetKeys);
+      if (!reordered || !environment) return;
       const server = environment.serverConfig?.settings.sidebarProjectOrder ?? null;
       const previous = usePendingOrder.getState().pending;
       const chained =
         previous?.environmentId === environment.environmentId &&
         previous.bases.some((base) => sameOrder(base, server));
+      const order = keepUnseenKeys(reordered, chained ? previous.order : (server ?? []));
       const pending = {
         environmentId: environment.environmentId,
         order,
