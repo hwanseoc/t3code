@@ -1,4 +1,4 @@
-import { AsyncResult } from "effect/unstable/reactivity";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { useCallback } from "react";
 import { create } from "zustand";
 import { toastManager } from "../components/ui/toast";
@@ -10,6 +10,7 @@ const EMPTY_ORDER: readonly string[] = [];
 
 // A reorder shows immediately and holds until the owning server's order it was
 // based on changes (our own broadcast, or another client's), or the save fails.
+// Compared by content: every settings broadcast decodes a fresh array.
 interface PendingOrder {
   readonly environmentId: string;
   readonly order: readonly string[];
@@ -52,6 +53,10 @@ export function reorderProjectKeys(
   return order;
 }
 
+function sameOrder(a: readonly string[] | null, b: readonly string[] | null) {
+  return a === b || (!!a && !!b && a.length === b.length && a.every((key, i) => key === b[i]));
+}
+
 function useProjectOrderEnvironment() {
   const { environments } = useEnvironments();
   const primaryId = usePrimaryEnvironmentId();
@@ -66,7 +71,11 @@ export function useProjectOrder(): readonly string[] {
   const environment = useProjectOrderEnvironment();
   const server = environment?.serverConfig?.settings.sidebarProjectOrder ?? null;
   const pending = usePendingOrder((state) => state.pending);
-  if (pending && pending.environmentId === environment?.environmentId && pending.base === server) {
+  if (
+    pending &&
+    pending.environmentId === environment?.environmentId &&
+    sameOrder(pending.base, server)
+  ) {
     return pending.order;
   }
   return server ?? EMPTY_ORDER;

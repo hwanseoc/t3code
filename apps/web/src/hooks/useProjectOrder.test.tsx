@@ -1,6 +1,6 @@
 import { DEFAULT_SERVER_SETTINGS } from "@t3tools/contracts";
 import * as Cause from "effect/Cause";
-import { AsyncResult } from "effect/unstable/reactivity";
+import * as AsyncResult from "effect/unstable/reactivity/AsyncResult";
 import { act, useLayoutEffect } from "react";
 import { create, type ReactTestRenderer } from "react-test-renderer";
 import { afterEach, beforeEach, expect, it, vi } from "vite-plus/test";
@@ -108,24 +108,37 @@ it("uses the primary server when one exists", async () => {
 });
 
 it("shows a reorder immediately and hands off to the server broadcast", async () => {
-  const original = ["remote:/a", "remote:/b"];
+  const original = ["remote:/a", "remote:/b", "remote:/c"];
   environments = [environment("remote", original)];
   let finish: (value: unknown) => void = () => {};
   mocks.persist.mockReturnValue(new Promise((resolve) => (finish = resolve)));
   act(() => renderer.update(<Probe />));
   let saved: Promise<void> | undefined;
   act(() => {
-    saved = reorder(original, ["remote:/a"], ["remote:/b"]);
+    saved = reorder(original, ["remote:/a"], ["remote:/c"]);
   });
-  expect(displayed).toEqual(["remote:/b", "remote:/a"]);
+  expect(displayed).toEqual(["remote:/b", "remote:/c", "remote:/a"]);
   await act(async () => {
     finish(AsyncResult.success(DEFAULT_SERVER_SETTINGS));
     await saved;
   });
-  expect(displayed).toEqual(["remote:/b", "remote:/a"]);
-  environments = [environment("remote", ["remote:/a", "remote:/b"])];
+  expect(displayed).toEqual(["remote:/b", "remote:/c", "remote:/a"]);
+  environments = [environment("remote", ["remote:/c", "remote:/b", "remote:/a"])];
   act(() => renderer.update(<Probe />));
-  expect(displayed).toEqual(["remote:/a", "remote:/b"]);
+  expect(displayed).toEqual(["remote:/c", "remote:/b", "remote:/a"]);
+});
+
+it("keeps a pending reorder through an unrelated settings broadcast", () => {
+  const original = ["remote:/a", "remote:/b"];
+  environments = [environment("remote", original)];
+  mocks.persist.mockReturnValue(new Promise(() => {}));
+  act(() => renderer.update(<Probe />));
+  act(() => {
+    void reorder(original, ["remote:/a"], ["remote:/b"]);
+  });
+  environments = [environment("remote", [...original])];
+  act(() => renderer.update(<Probe />));
+  expect(displayed).toEqual(["remote:/b", "remote:/a"]);
 });
 
 it("moves grouped project members together and ignores no-op drags", () => {
